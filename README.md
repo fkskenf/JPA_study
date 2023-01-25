@@ -148,3 +148,125 @@ em.persist(member);
 > 3. 양방향이 필요한 이유는 반대 방향으로 객체그래프를 탐색하기 위해서이다.
 > 4. JPQL에서는 역방향으로 탐색할 일이 많다.
 > 5. 단방향 매핑을 잘 하고 양방향은 필요할 때 추가해도 된다.
+
+10.  (N:1) 연관관게 매핑 예시 -> 주로 사용
+```sql
+SELECT
+  A.member_no,
+  B.member_name,
+  B.member_address
+FROM
+  TEAM A
+    JOIN
+  MEMBER B
+    ON
+  A.member_no = B.member_no
+```
+```java
+@Entity
+@Table(name = "MEMBER")
+public class Member {
+    //..중략
+
+    @ManyToOne
+    @JoinColumn(name = "TEAM_ID") // pk
+    private Team team
+
+    //..중략
+}
+```
+```java
+@Entity
+@Table(name = "TEAM")
+public class Team {
+    //..중략
+
+    @OneToMany(mappedBy = "team")
+    private List<MemberTest> members = new ArrayList<MemberTest>();
+
+    //..중략
+}
+```
+11. (1:N) 연관관계 매핑시 문제점 
+> 1. 팀(1) 엔티티를 수정하였는데 맴버(N) 테이블에 업데이트 쿼리가 나가는 현상 발생.
+> 2. 실무에서는 테이블이 수십개가 엮여서 돌아가는 상황, 위와 같은 상황은 운영을 힘들게 한다.
+> -  해결 방안Permalink
+>> 1. 객체지향적으로 조금 손해를 볼 수 있지만, 다대일 단방향, 양방향을 사용한다.
+>> 2. 즉, 먼저 학습한 다대일 단방향 관계로 매핑하고, 필요한 경우 양방향 매핑을 통해 해결한다.
+>> 3. 객체 입장에서 보면, 반대방향으로 참조할 필요가 없는데 관계를 하나 만드는 것이지만, DB의 입장으로 설계의
+>> 4. 방향을 조금 더 맞춰서 운영상 유지보수하기 쉬운 쪽으로 선택할 수 있다.
+
+```java
+//수정 전: 이런식으로 매핑을 하면 연관관계의 주인이 2개가 된다.
+@ManyToOne
+@JoinColumn(name = "TEAM_ID")
+private Team team;
+
+//수정 후: 읽기 전용으로 변경하여, 양방향 매핑을 한 효과를 만들어낸다.
+@ManyToOne
+@JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
+private Team team;
+```
+> - 일대다 단방향 매핑의 단점
+>> 1. 엔티티가 관리하는 외래키가 다른 테이블에 있음
+>> 2. 연관관계 관리를 위해 추가로 UPDATE SQL 실행. (성능 문제)
+>> 3. 일대다 단방향 매핑보다는 다대일 양방향 매핑을 사용하자.
+>> 4. 객체간의 참조를 하나 더 넣는 한이 있더라도 다대일 사용.
+
+12. (1:1) 연관관계 매핑시
+> 1. 주 테이블에 외래키 양방향 정리
+>> 1. 다대일 양방향 매핑처럼 외래키가 있는곳이 연관관계의 주인
+>> 2. 반대편은 mappedBy 적용을 해야한다.
+> 2. DB관점에서 많이 조회되는 것을 기준으로 외래크를 적용해야 한번의 쿼리로 쉽게 조회 가능 
+> 3. 테이블에 외래키
+>> 1. 주 객체가 대상 객체의 참조를 가지는것처럼, 주 테이블에 외래키를 두고 대상 테이블을 찾는다.
+>> 2. 객체지향 개발자가 선호한다
+>> 3. JPA 매핑 편리
+>>> 1. 장점: 주 테이블만 조회해도 대상 테이블에 데이터가 있는 확인 가능
+>>> 2. 단점: 값이 없으면 외래키에 NULL 허용
+> 4. 대상 테이블에 외래키
+>> 1. 대상 테이블에 외래키가 존재
+>> 2. 전통적인 DB 개발자가 선호한다
+>>> 1. 장점: 주 테이블, 대상 테이블을 일대일에서 일대다로 변경 시 테이블 구조 유지가능
+>>> 2. 단점: 프록시 기능의 한계로 지연로딩 설정해도 항상 즉시 로딩됨
+
+13. (N:N) 연관관계 매핑 
+> 1. 다대다 관계는 연결 테이블을 추가해서 일대다, 다대일 관계로 풀어야한다.
+> 2. @ManyToMany
+>> 1.  즉, 원하는 정보가 아닌 추가적인 정보가 들어갈 수 있다.
+>> 2. 쿼리가 이상하게 나가는 현상이 발생할 수 있다.
+> 3. @ManyToMany -> @OneToMany, @ManyToOne으로 변경
+>> - 중간에 연결테이블을 활용하여 다대다를 일대다/다대일로 변경하여 사용한다.
+```java 
+@Entity
+public class MemberProduct {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name="MEMBER_ID")
+    private Member member;
+
+    @ManyToOne
+    @JoinColumn(name="PRODUCT_ID")
+    private Product product;
+
+    // 추가적으로 컬럼을 설정할 수 있다.
+    private int count;
+    private int price;
+
+    private LocalDateTime orderDateTime;
+}
+```
+
+14. 슈퍼타입과 서브타입
+> - 슈퍼타입 서브타입 논리 모델을 실제 물리 모델로 구현하는 방법은 아래와 같다.
+> 1. 각각 테이블로 변환
+>> 조인 전략
+> 2. 통합 테이블로 변환
+>> 단일 테이블 전략
+> 3. 서브타입 테이블로 변환
+>> 구현 클래스마다 테이블 전략
+
