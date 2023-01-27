@@ -270,3 +270,79 @@ public class MemberProduct {
 > 3. 서브타입 테이블로 변환
 >> 구현 클래스마다 테이블 전략
 
+15. @JoinColumn
+> 외래키 매핑 시 사용이 되는 어노테이션.
+```java
+@Entity
+public class Team {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @OneToMany(mappedBy = "team") // Member Entity의 team 객체를 바라본다
+    private List<Member> members = new ArrayList<Member>();
+    //..중략
+}
+```
+```java
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "TEAM_ID") // 외래키로 매핑될 컬럼을 지정 (TEAM : PK)
+    private Team team;
+}
+```
+
+16. 상속관계매핑
+> - 각각의 엔티티를 상속 관계로 연결한 후 실행하면, JPA에서는 기본적으로 단일 테이블 전략을 사용한다.
+> - 해결 : 단일 테이블 전략 -> 조인 전략으로 변경
+>> 기존 부모(상위)클래스에 @Inheritance 어노테이션을 추가한다.
+```java
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED) // 상속 관계 매핑 추가
+public class Item {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+    private int price;
+    //..중략 Getter Setter
+}
+```
+> - 부모 - 자식 관계에서 어떤 자식의 타입인지 구분하기 위해 사용.
+>> @DiscriminatorColumn 어노테이션을 추가
+```java
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn // 해당 어노테이션 추가
+// @DiscriminatorColumn(name = "DIS_TYPE") 이름을 지정할 수 있다
+public class Item {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+    private int price;
+    //..중략 Getter Setter
+}
+```
+```SQL
+Hibernate:
+/* insert com.hello.jpasample.Movie
+    */ insert
+    into
+        Item
+        (name, price, DTYPE, id)
+    values
+        (?, ?, 'Movie', ?)
+```
+
